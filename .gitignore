@@ -1,0 +1,23 @@
+# Extracted EverQuest game assets — NEVER commit (copyright / no redistribution)
+*.dds
+*.glb
+*.gltf
+*.mod
+*.s3d
+*.eqg
+*.wld
+*.blend
+*.blend1
+*.fbx
+*.ktx
+assets/
+work/
+Textures/
+Animations/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local scratch
+*.log

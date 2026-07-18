@@ -1,0 +1,51 @@
+{
+  "name": "Maskoi-Armored",
+  "race_token": "ikm",
+  "base_glb": "source/assets/base-iksar/ikm.glb",
+  "plate_dir": "source/assets/velious-plate",
+  "armor_tiles_dir": "source/assets/plate-set04",
+  "armor_set": "04",
+  "armor_parts": [
+    "ch",
+    "lg",
+    "ft",
+    "hn",
+    "ua"
+  ],
+  "greave_mods": [
+    "it238557.mod",
+    "it238558.mod"
+  ],
+  "dye": "teal",
+  "axes": {
+    "jaw_open": {
+      "bone": "fajaw",
+      "axis": 0,
+      "amount": -0.35
+    },
+    "foot_flat": {
+      "axis": 0,
+      "amount": 1.05
+    },
+    "lid_top": {
+      "axis": 0,
+      "amount": 1.1
+    },
+    "lid_bot": {
+      "axis": 0,
+      "amount": -0.5
+    },
+    "arm_down": {
+      "axis": 2,
+      "amount": 0.95
+    },
+    "breath": {
+      "bone": "chchest",
+      "axis": 2,
+      "amount": 0.012,
+      "frames": 96
+    }
+  },
+  "notes": "Reference config = Maskoi V50. For a new race: change race_token/base_glb/greaves, re-lab axes if the face misbehaves.",
+  "target_height_m": 2.1
+}
