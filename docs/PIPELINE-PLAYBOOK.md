@@ -2,7 +2,27 @@
 *The formula, distilled from Maskoi V1–V50 (2026-07-17). Read this before building any new avatar.*
 
 Current gold build: `source/scripts/build_maskoi_V50_polish.py` + `source/scripts/postprocess_textures.py`
-Import protocol: **Animaze Editor → Avatar3D → STANDARD (never ARKit)** → Snap to ground → Save → Bundle.
+
+## IMPORT MODE — the one rule (supersedes all older "never ARKit" wording)
+**Import as STANDARD unless the specific build was made for ARKit.**
+- **STANDARD** = bone-driven face clips (the proven default). Ships NO blendshapes.
+- **ARKit** = blendshape/morph-target face. Only for builds that deliberately ship
+  ARKit-named shape keys (`jawOpen`, `eyeBlinkLeft`, …). A Standard build imported as
+  ARKit has no face; an ARKit build imported as Standard fires blendshapes on autoblink.
+- Match the import mode to what the FBX actually carries. This is a per-build decision,
+  not a blanket ban. (Earlier docs said "never ARKit" — that was true while we only
+  shipped bone clips; it is superseded now that the ARKit shape-key path is in play.)
+Protocol: Animaze Editor → Avatar3D → **[STANDARD or ARKit per the build]** → Snap to ground → Save → Bundle.
+
+## DEFINITION OF "PROVEN" (do not call anything proven until all four)
+For this project, "proven" / "confirmed working" means, strictly:
+1. Imported **fresh** into Animaze (new folder + FBX basename — caching lies otherwise),
+2. **Import log attached** (no unexpected errors),
+3. **Screenshots attached** (front / side / face as relevant),
+4. **Visual QA passed** by a human looking at the actual app.
+Anything short of that is a **candidate**, not proven. A clean Blender render, a passing
+integrity check, or "the log looks fine" prove references exist — NOT that it looks right.
+(Renders can lie; the app is the only truth. Learned repeatedly.)
 
 ---
 
