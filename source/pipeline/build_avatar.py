@@ -845,6 +845,16 @@ body.data.materials.append(atlas_mat)
 for poly in body.data.polygons:
     poly.material_index = 0
 
+# EQ character/armor is fully opaque; the only alpha in these textures is EQ's
+# env-shine mask (flattened to 255 in postprocess). Blender 4.5 defaults any
+# alpha-bearing image material to HASHED blend, which dithers the plates into a
+# glassy/translucent look. Force OPAQUE so nothing ghosts through the armor.
+for _m in bpy.data.materials:
+    try:
+        _m.blend_method = 'OPAQUE'
+    except (AttributeError, TypeError):
+        pass
+
 with open(OUT_DIR / "atlas_manifest.json", "w") as fh:
     json.dump({"cell": CELL, "cols": GRID_COLS, "rows": GRID_ROWS,
                "atlas": "Maskoi_Body_Atlas.png", "dye": CFG.get("dye", "authentic"),
