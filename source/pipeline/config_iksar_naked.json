@@ -1,0 +1,25 @@
+{
+  "name": "Iksar-Naked-Test",
+  "race_token": "ikm",
+  "base_glb": "source/assets/base-iksar/ikm.glb",
+  "plate_dir": "source/assets/velious-plate",
+  "armor_tiles_dir": "source/assets/plate-set04",
+  "armor_set": "04",
+  "armor_parts": [],
+  "greave_mods": [],
+  "dye": "authentic",
+  "axes": {
+    "jaw_open": { "bone": "fajaw", "axis": 0, "amount": -0.22 },
+    "foot_pose": {
+      "_source": "EQ o01 idle frame 1 - authored flat-foot stance, heels down",
+      "bofootl": [-0.3008, 1.4507, -0.3810],
+      "bofootr": [-0.0573, 1.2701, -0.2859]
+    },
+    "lid_top": { "axis": 0, "amount": 1.1 },
+    "lid_bot": { "axis": 0, "amount": -0.5 },
+    "arm_down": { "axis": 2, "amount": 0.95 },
+    "breath": { "bone": "chchest", "axis": 2, "amount": 0.012, "frames": 96 }
+  },
+  "notes": "Quick naked-Iksar test: no armor, no dye, no greaves. Validate animations + stance in Animaze.",
+  "target_height_m": 2.1
+}

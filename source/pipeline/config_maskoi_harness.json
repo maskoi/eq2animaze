@@ -1,0 +1,25 @@
+{
+  "name": "Maskoi-Harness",
+  "race_token": "ikm",
+  "base_glb": "source/assets/base-iksar/ikm.glb",
+  "plate_dir": "source/assets/velious-plate",
+  "armor_tiles_dir": "source/assets/global4-iksar/Textures",
+  "armor_set": "00",
+  "armor_parts": ["ch", "lg", "ua", "fa", "ft", "hn"],
+  "greave_mods": [],
+  "dye": "authentic",
+  "axes": {
+    "jaw_open": { "bone": "fajaw", "axis": 0, "amount": -0.22 },
+    "foot_pose": {
+      "_source": "EQ o01 idle frame 1 - heel-down flat plant",
+      "bofootl": [-0.3008, 1.4507, -0.3810],
+      "bofootr": [-0.0573, 1.2701, -0.2859]
+    },
+    "lid_top": { "axis": 0, "amount": 1.1 },
+    "lid_bot": { "axis": 0, "amount": -0.5 },
+    "arm_down": { "axis": 2, "amount": 0.95 },
+    "breath": { "bone": "chchest", "axis": 2, "amount": 0.012, "frames": 96 }
+  },
+  "notes": "Maskoi harness build: global4 Iksar (harness + loincloth + reddish leg drape) base. Build as-is first to confirm the harness matches the screenshot, THEN strip the leg drape (ikmlg0001 -> bare sk) for the no-pants look.",
+  "target_height_m": 2.1
+}

@@ -107,14 +107,14 @@ def set04_multiplier():
     _SET04_MULT = solve_plate_multipliers(lin, PLATE_TARGET)
     return _SET04_MULT
 
-# Malachite ramp CALIBRATED against references/original-maskoi/front-close.png
-# armor samples: shadows (0,16,3) / mids (0,121,80) / highlights (2,216,197).
-# The hue SHIFTS with luminance (pure green shadows -> cyan-mint highlights)
-# and red stays ~0 across the whole ramp. V54 lesson: any red contamination
-# (white bloom, pastel base tint) reads as toy plastic ("Micronauts").
-# V53 lesson: any luminance floor/cap crushes the marble into flat mint.
-EMERALD_RAMP = ((0, 10, 2), (0, 121, 80), (10, 225, 205))
-DYE_EXP = 0.40  # midtone lift; tile-lum median lands on the reference median
+# Cohort's Legionnaire teal — RECALIBRATED against the real in-game Cohort's
+# screenshots (bright shiny cyan-teal with a metallic near-white sheen), NOT the
+# older dull-emerald reference. Key differences from the old ramp: much brighter
+# and more saturated cyan-teal mids, and highlights that push toward metallic
+# near-white (the wet-plate shine). Mids stay LOW-red (saturated, no plastic
+# pastel — the "Micronauts" trap); only the specular highlight goes bright/white.
+EMERALD_RAMP = ((0, 65, 58), (15, 200, 185), (175, 252, 248))
+DYE_EXP = 0.32  # lift midtones brighter so more of the plate reads vivid teal
 
 def _colorize(px):
     """Marble-preserving emerald: tile luminance carries ALL the detail and
@@ -150,14 +150,22 @@ def compose_atlas(build_dir, tex_dir):
         return None
     man = json.loads(mpath.read_text())
     cell, cols, rows = man["cell"], man["cols"], man["rows"]
+    # Config-driven: which armor tile set (00 cloth, 04 plate, ...) and dir this
+    # build used. Falls back to the plate defaults for older manifests.
+    tiles_dir = (HANDOFF / man["tiles_dir"]) if man.get("tiles_dir") else SET04_DIR
+    armor_set = man.get("armor_set", "04")
+    race = man.get("race_token", "ikm")
     atlas = Image.new("RGBA", (cols * cell, rows * cell), (128, 128, 128, 255))
     for e in man["entries"]:
         src_name = e["source"]
         if not src_name:
             continue
         tile = None
-        if _re.match(r"ikm(ch|lg|ft|hn|ua|ta)\d\d\d\d\.png", src_name):
-            src = SET04_DIR / src_name
+        # fa + he were missing from this alternation: any forearm/head tile in the
+        # project tiles_dir silently fell through to the Lantern-authentic fallback
+        # and, if absent there, shipped as flat 128-grey canvas (the V3 grey-forearm bug).
+        if _re.match(race + r"(ch|lg|ft|hn|ua|ta|fa|he)\d\d\d\d\.png", src_name):
+            src = tiles_dir / src_name
             if src.exists():
                 tile = Image.open(src).convert("RGBA")
                 tile.putalpha(255)  # authentic pixels, opaque
@@ -168,8 +176,11 @@ def compose_atlas(build_dir, tex_dir):
                 # in teal mode, or the canvas blows out white / goes raw grey.
                 if tile.size[0] <= 16:
                     part = src_name[3:5]
-                    big = sorted(SET04_DIR.glob(f"ikm{part}04*.png"),
-                                 key=lambda q: Image.open(q).size[0] * Image.open(q).size[1])[-1]
+                    _bigs = sorted(tiles_dir.glob(f"{race}{part}{armor_set}*.png"),
+                                 key=lambda q: Image.open(q).size[0] * Image.open(q).size[1])
+                    if not _bigs:
+                        continue
+                    big = _bigs[-1]
                     bigimg = Image.open(big).convert("RGBA")
                     if man.get("dye") == "teal":
                         b2 = Image.new("RGBA", bigimg.size)

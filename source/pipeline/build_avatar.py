@@ -452,6 +452,15 @@ def add_shape(name, moves):
 source_action = armature.animation_data.action if armature.animation_data else None
 animaze_actions = []
 
+# Law-5 canonical reference (D7): capture every bone's rest rotation ONCE, in XYZ,
+# BEFORE any clip is built. All clip builders below take their frame-1 base from
+# this instead of the LIVE bone rotation -- which a prior clip silently poisons
+# (the active action re-evaluates e.g. fajaw to its open value, so the next clip's
+# "rest" base is 0.35 rad off -> Animaze's "fajaw ROTATION differences (20deg)").
+for _pb in armature.pose.bones:
+    _pb.rotation_mode = 'XYZ'
+REST_REF = {_pb.name: _pb.rotation_euler.copy() for _pb in armature.pose.bones}
+
 
 def make_rotation_action(name, bone_name, axis, amount):
     bone = armature.pose.bones.get(bone_lookup.get(bone_name.lower(), bone_name))
@@ -462,7 +471,7 @@ def make_rotation_action(name, bone_name, axis, amount):
     armature.animation_data_create()
     armature.animation_data.action = action
     bone.rotation_mode = 'XYZ'
-    base = bone.rotation_euler.copy()
+    base = REST_REF.get(bone.name, bone.rotation_euler.copy())  # D7: canonical rest
     for frame, factor in ((1, 0.0), (8, 1.0), (16, 0.0)):
         bone.rotation_euler = base.copy()
         bone.rotation_euler[axis] += amount * factor
@@ -500,7 +509,7 @@ def make_pose_action(name, bone_name, axis, amount):
     armature.animation_data_create()
     armature.animation_data.action = action
     bone.rotation_mode = 'XYZ'
-    base = bone.rotation_euler.copy()
+    base = REST_REF.get(bone.name, bone.rotation_euler.copy())  # D7: canonical rest
     for frame, factor in ((1, 0.0), (8, 1.0), (16, 1.0)):
         bone.rotation_euler = base.copy()
         bone.rotation_euler[axis] += amount * factor
@@ -561,7 +570,12 @@ JAWO = AX['jaw_open']['amount']
 def JW(v=None):
     return (JAWB, JAWAX, JAWO if v is None else math.copysign(v, JAWO))
 
-def make_face_action(name, moves):
+def make_face_action(name, moves, held=frozenset()):
+    # JAWTEST: `held` = set of (bone_name, axis) whose channel is pinned at its
+    # full amount on EVERY frame (incl. frame 1). Animaze validates MouthOpen_*
+    # variants' reference frame (frame 1) against MouthOpen's HELD OPEN pose,
+    # and layers the variant relative to that reference; the jaw must therefore
+    # START open in every MouthOpen-family variant.
     action = bpy.data.actions.new(name)
     animaze_actions.append(action)
     armature.animation_data_create()
@@ -572,14 +586,14 @@ def make_face_action(name, moves):
         if not bone:
             continue
         bone.rotation_mode = 'XYZ'
-        bases[bone_name] = bone.rotation_euler.copy()
+        bases[bone_name] = REST_REF.get(bone.name, bone.rotation_euler.copy())  # D7: canonical rest
     for frame, factor in ((1, 0.0), (8, 1.0), (16, 1.0)):
         per_bone = {}
         for bone_name, axis, amount in moves:
             if bone_name not in bases:
                 continue
             e = per_bone.setdefault(bone_name, bases[bone_name].copy())
-            e[axis] += amount * factor
+            e[axis] += amount * (1.0 if (bone_name, axis) in held else factor)
         for bone_name, e in per_bone.items():
             bone = armature.pose.bones.get(bone_lookup.get(bone_name.lower(), bone_name))
             bone.rotation_euler = e
@@ -660,7 +674,13 @@ _face_set = {
     'lipsync_Y':  [(LIP, 0, -0.22), JW(0.06)],
 }
 for _name, _moves in _face_set.items():
-    make_face_action(_name, _moves)
+    # JAWTEST: MouthOpen-family variants must START with the jaw already at
+    # MouthOpen's held open pose (Animaze validates their frame 1 against it
+    # and layers them on the open mouth). Pin the jaw channel for exactly the
+    # clips Animaze family-checks: every MouthOpen* pose variant except the
+    # parent itself.
+    _held = {(JAWB, JAWAX)} if (_name.startswith('MouthOpen') and _name != 'MouthOpen') else frozenset()
+    make_face_action(_name, _moves, held=_held)
 
 # eye close-squint combo (animtree: "has eye close squint animation")
 make_face_action('LeftEyeClosed_Squint',  [(LT, 0, 1.0), (LB, 0, -0.65)])
@@ -709,18 +729,24 @@ bpy.context.scene.frame_set(1)
 bpy.context.view_layer.update()
 
 # Stance fix: the GLB's static pose hangs the feet en pointe (the "flying,
-# toes-down" look). Bake dorsiflexion into the export stance. L/R signs MIRROR
-# exactly like the arms (lab-verified: bofootl negative / bofootr positive
-# plants both feet flat and splayed). Applied AFTER armor authoring so the
-# boot geometry rides the foot bones like any animation, and BEFORE the pose
-# snapshot so grounding + every export inherit the planted stance.
-_ff = AX.get('foot_flat')
-if _ff and _ff.get('amount'):
-    for _fb, _fsgn in (('bofootl', -1.0), ('bofootr', 1.0)):
+# toes-down" look). Bake EQ's OWN authored flat-foot stance into the export.
+# RENDER-VERIFIED (2026-07-18): a single-axis hand rotation (the old foot_flat
+# 0.75) only planted the toe-pads — the heel stayed off the floor. EQ's idle clip
+# (o01) rotates each foot ~73-83 deg on local Y plus small X/Z, and the L/R values
+# DIFFER; lifting those exact per-foot eulers is what actually drops the heel to
+# the ground. config foot_pose carries the extracted values (keys starting with
+# '_' are metadata). Applied AFTER armor authoring so the boot geometry rides the
+# foot bones, and BEFORE the pose snapshot so grounding + every export inherit it.
+_fp = AX.get('foot_pose')
+if _fp:
+    from mathutils import Euler as _Euler
+    for _fb, _e in _fp.items():
+        if _fb.startswith('_'):
+            continue
         _fpb = armature.pose.bones.get(bone_lookup.get(_fb, _fb))
         if _fpb:
             _fpb.rotation_mode = 'XYZ'
-            _fpb.rotation_euler[_ff.get('axis', 0)] += _fsgn * _ff['amount']
+            _fpb.rotation_euler = _Euler(_e, 'XYZ')
     bpy.context.view_layer.update()
     # The stance IS the rest pose (the GLB ships no animations, so its static
     # node transforms became the edit-bone rest on import). A pose-bone
@@ -744,7 +770,7 @@ if _ff and _ff.get('amount'):
     bpy.ops.pose.armature_apply(selected=False)
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.context.view_layer.update()
-    print("FOOT FLAT baked into rest pose:", _ff)
+    print("EQ FOOT POSE baked into rest pose:", _fp)
 
 for pb in armature.pose.bones:
     POSE_SNAPSHOT[pb.name] = pb.matrix_basis.copy()
@@ -838,8 +864,11 @@ atlas_mat = bpy.data.materials.new("Maskoi Body Atlas")
 atlas_mat.use_nodes = True
 direct_image_link(atlas_mat, atlas_img)
 absdf = next(n for n in atlas_mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED')
-absdf.inputs['Metallic'].default_value = 0.25
-absdf.inputs['Roughness'].default_value = 0.45
+# Iksar hide is organic, NOT metal. Metallic 0.25 made Animaze render him glassy/
+# reflective and washed the scaled-skin albedo to pale grey ("made of glass").
+# Skin = 0 metallic, high roughness (matte with only a faint scale sheen).
+absdf.inputs['Metallic'].default_value = 0.0
+absdf.inputs['Roughness'].default_value = 0.82
 body.data.materials.clear()
 body.data.materials.append(atlas_mat)
 for poly in body.data.polygons:
@@ -858,6 +887,8 @@ for _m in bpy.data.materials:
 with open(OUT_DIR / "atlas_manifest.json", "w") as fh:
     json.dump({"cell": CELL, "cols": GRID_COLS, "rows": GRID_ROWS,
                "atlas": "Maskoi_Body_Atlas.png", "dye": CFG.get("dye", "authentic"),
+               "tiles_dir": CFG["armor_tiles_dir"], "armor_set": CFG["armor_set"],
+               "race_token": CFG["race_token"],
                "entries": manifest}, fh, indent=1)
 print("ATLAS: ", n_cells, "cells", ATLAS_W, "x", ATLAS_H)
 # ============ END ATLAS BAKE ============
@@ -867,6 +898,15 @@ restore_pose()
 # Ground the avatar: EQ authored the rig hip-centered, leaving the feet ~3.9
 # units below origin, so Animaze floats him. Lift the whole rig so the lowest
 # point (claw tips) sits exactly at z=0.
+#
+# CRITICAL: measure in the REST pose, not the current (posed) state. The FBX
+# bind ships the REST pose, and the feet are never moved by a clip, so Animaze
+# displays them at their REST position. Grounding the arms-down posed state left
+# the rest-pose feet ~0.79 units high -> he floated (scaled: 0.79 * export_scale
+# ~= 0.24 in-app). Switch to REST for the measurement, then restore POSE.
+_prev_pose_position = armature.data.pose_position
+armature.data.pose_position = 'REST'
+bpy.context.view_layer.update()
 _ground_deps = bpy.context.evaluated_depsgraph_get()
 _lowest = 1e9
 for _o in bpy.data.objects:
@@ -879,9 +919,11 @@ for _o in bpy.data.objects:
         if z < _lowest:
             _lowest = z
     _ev.to_mesh_clear()
+armature.data.pose_position = _prev_pose_position
+bpy.context.view_layer.update()
 armature.location.z -= _lowest
 bpy.context.view_layer.update()
-print("GROUNDED: lifted by", round(-_lowest, 3))
+print("GROUNDED (rest pose): lifted by", round(-_lowest, 3))
 
 # Normalize export scale: EQ units make him ~7m tall in Animaze (feet dangle,
 # toes-down hang). Scale the FBX export to a human-standard height.
