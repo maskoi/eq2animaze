@@ -53,6 +53,54 @@ integrity check, or "the log looks fine" prove references exist — NOT that it 
 
 ---
 
+## MANDATORY DEFAULTS — every avatar gets these, hard-coded in `build_avatar.py`
+*These are NOT per-model tuning. They are baked in and apply to EVERY race automatically.*
+*If a render/import ever shows one of these wrong, fix the DEFAULT in code — never one model.*
+
+| # | Default | Value / source | Why (the failure it prevents) |
+|---|---------|----------------|-------------------------------|
+| D1 | **Matte hide** | Body atlas material: `Metallic = 0.0`, `Roughness = 0.82` | Metallic > 0 makes Animaze render him glassy/reflective and washes the skin to pale grey ("made of glass"). Skin is organic, never metal. |
+| D2 | **Feet: EQ idle pose** | Per-race `foot_pose` = the `o01` idle clip's per-foot euler (heel-DOWN flat), baked into the rest pose. NOT a hand-rotated single axis. | Single-axis `foot_flat` only plants the toe-pads; heel stays up. EQ's own idle already solved the flat plant — lift its numbers per race (each race has an `o01`). |
+| D3 | **Arms down** | `arm_down` on `bibicepl/r`, axis 2, ±0.95 (mirrored — arms DO mirror; feet do NOT). | T-pose rest → Animaze applies the `idle_naturalPose` clip to lower them. |
+| D4 | **Grounded to floor** | Ground the REST pose (feet → z=0) + Animaze hip-anchor compensation (constant, measured once per skeleton family). | Animaze hangs the avatar from the hip/root; flat feet reach ~0.2m less than the old pointed feet → floats. Compensation drops him back onto the floor. |
+| D5 | **Opaque** | `blend_method = 'OPAQUE'` on all materials. | Blender 4.5 defaults alpha-bearing images to HASHED → dithered/translucent ghosting. |
+| D6 | **Postprocessed color** | `postprocess_textures.py` run after EVERY build (Law 4). | Blender can't ship correct colors; raw atlas is dark. |
+| D7 | **Jaw reference locked** | Every `MouthOpen_*` variant's frame-1 jaw = the SAME value as `MouthOpen` (Law 5). Capture the canonical rest ONCE; do not read live (action-contaminated) bone rotation per clip. | Drifting jaw reference = the `fajaw has ROTATION differences (20°)` import errors = mouth opens too wide. |
+
+**Working rule:** build → postprocess → import. Trust the formula. Render ONLY at a real checkpoint
+or when a human flags something — not after every stage. Renders can lie (Law: the app is the only truth).
+
+---
+
+## THE APPEARANCE RECIPE — written in stone (2026-07-18)
+*How to put ANY EQ look (naked, harness, armor) on a working avatar. Do not deviate.*
+
+**RULE 1 — The RIG always comes from the base race model, NEVER a textured variant export.**
+- Base = `source/assets/base-iksar/ikm.glb` (globalikm) — full skeleton: `fajaw`, `bofootl`,
+  `bibicepl`, `hehead`, all of it. Face + body clips attach, poses apply, animations work.
+- **NEVER** point `base_glb` at a `global4/ikm.glb`-style equipment export. Those are stripped
+  meshes (~40 nodes, ZERO animation bones). Used as a base they produce a crumpled grey gremlin:
+  no pose, no foot fix, no arms-down, half-size atlas. (Learned the hard way, 2026-07-18.)
+
+**RULE 2 — The LOOK is a texture SWAP onto that rig, via the armor system.** In config:
+- `armor_tiles_dir` = folder holding the look's tiles (e.g. `source/assets/global4-iksar/Textures`).
+- `armor_set` = the EQ material number: **00** = naked / cultural harness+loincloth, **04** = plate, etc.
+- `armor_parts` = which body regions to swap: `["ch","lg","ua","fa","ft","hn"]` (omit `he` to keep the natural head).
+- The remap matches `d_ikm(part)sk(NN)` → tile `ikm(part)(SET)(NN).png`, records it in the manifest,
+  and `postprocess_textures.py` composes the shipped atlas from those tiles. Rig untouched, look changes.
+
+**Proven configs:**
+- Naked/bare: `config_iksar_naked.json` (armor_parts `[]` → keeps sk skin).
+- Harness + loincloth: `config_maskoi_harness.json` (base-iksar rig, `armor_set 00`,
+  `armor_tiles_dir` = global4 Textures → harness chest + loincloth + bare-scaled legs, full 144 clips).
+
+**D4 GROUNDING — resolved.** The pipeline grounds the rest pose to z=0; the FINAL floor plant is
+Animaze's **Snap to Ground** (the import protocol's own step) → **Save**. Do NOT chase a pipeline
+offset — the flat-foot pose changes reach per race, so the constant would drift. Snap to Ground
+handles it in-app, every time.
+
+---
+
 ## BUILD PIPELINE (stages in the V50 script)
 
 1. Import base glb (LanternExtractor output) → delete junk `Icosphere` → fold UVs to 0..1.
